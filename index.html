@@ -1,0 +1,955 @@
+<!DOCTYPE html>
+<html lang="en" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ashirwad Sanitary & Tiles | Ultra Futuristic</title>
+    <!-- Tailwind CSS CDN for a clean and modern look -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts for a sleek, futuristic look -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
+    <!-- FontAwesome for cool icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Firebase SDKs for Firestore and Auth -->
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, serverTimestamp, query, orderBy } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // Global variables for Firebase auth and app ID
+        const firebaseConfig = JSON.parse(typeof __firebase_config !== 'undefined' ? __firebase_config : '{}');
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+        const __initial_auth_token = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : null;
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        let userId = null;
+        let isAuthReady = false;
+
+        async function initAuth() {
+            try {
+                if (__initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
+            } catch (error) {
+                console.error("Firebase auth error:", error);
+            }
+        }
+
+        onAuthStateChanged(auth, async (user) => {
+            if (user) {
+                userId = user.uid;
+                isAuthReady = true;
+                console.log("User authenticated:", userId);
+                setupChatListener();
+            } else {
+                console.log("User is signed out. Attempting anonymous sign-in.");
+                try {
+                    await signInAnonymously(auth);
+                } catch(e) {
+                    console.error("Anonymous sign-in failed:", e);
+                }
+            }
+        });
+
+        const chatContainer = document.getElementById('chat-messages');
+
+        function setupChatListener() {
+            if (!isAuthReady || !userId) {
+                console.error("Auth not ready for chat listener.");
+                return;
+            }
+
+            const chatPath = `artifacts/${appId}/public/data/chat`;
+            const q = query(collection(db, chatPath));
+
+            onSnapshot(q, (querySnapshot) => {
+                const messages = [];
+                querySnapshot.forEach((doc) => {
+                    const message = doc.data();
+                    messages.push(message);
+                });
+
+                messages.sort((a, b) => (a.timestamp?.toMillis() || 0) - (b.timestamp?.toMillis() || 0));
+
+                chatContainer.innerHTML = '';
+                messages.forEach(message => {
+                    const isAI = message.userId === 'AI Robo';
+                    const messageElement = document.createElement('div');
+                    messageElement.className = `mb-2 p-3 rounded-xl shadow-md ${isAI ? 'bg-purple-900 text-purple-100 self-start' : 'bg-blue-900 text-blue-100 self-end'}`;
+                    messageElement.style.maxWidth = '80%';
+                    
+                    const formattedUserId = isAI ? 'AI Robo' : 'User: ' + userId.substring(0, 8);
+                    
+                    messageElement.innerHTML = `
+                        <div class="text-xs font-mono mb-1 text-gray-400">${formattedUserId}</div>
+                        <p class="text-sm break-words">${message.text}</p>
+                    `;
+                    chatContainer.appendChild(messageElement);
+                });
+
+                chatContainer.scrollTop = chatContainer.scrollHeight;
+            });
+        }
+
+        async function sendMessage(messageText, isAI = false) {
+            if (!isAuthReady || !userId) {
+                console.error("User not authenticated, cannot send message.");
+                return;
+            }
+            if (!messageText.trim()) return;
+
+            const chatPath = `artifacts/${appId}/public/data/chat`;
+            try {
+                await addDoc(collection(db, chatPath), {
+                    text: messageText,
+                    timestamp: serverTimestamp(),
+                    userId: isAI ? 'AI Robo' : userId,
+                });
+            } catch (e) {
+                console.error("Error adding document: ", e);
+            }
+        }
+
+        async function handleMessageSubmit(event) {
+            event.preventDefault();
+            const messageInput = document.getElementById('chat-input');
+            const messageText = messageInput.value.trim();
+
+            if (messageText) {
+                if (isAuthReady) {
+                    await sendMessage(messageText);
+
+                    // AI Robo response logic
+                    const roboKeywords = ["address", "contact", "number", "location", "phone", "map", "hours", "open", "time"];
+                    if (roboKeywords.some(keyword => messageText.toLowerCase().includes(keyword))) {
+                        await sendMessage("Our showroom is located at Shop No M-D1, Sec-D, Near Green Medicals Centre, Power House Road, LDA Colony-226012, Lucknow. You can contact us at +91-9335222840. We are open all days except Thursday.", true);
+                    }
+                } else {
+                    console.error("Authentication not ready. Please wait.");
+                }
+                messageInput.value = '';
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const chatForm = document.getElementById('chat-form');
+            if (chatForm) {
+                chatForm.addEventListener('submit', handleMessageSubmit);
+            }
+            initAuth();
+        });
+
+        // Make sendMessage available globally for other scripts
+        window.sendMessage = sendMessage;
+    </script>
+    <style>
+        :root {
+            --bg-primary: #0d0d0d;
+            --bg-secondary: #1a1a1a;
+            --text-color: #f2f2f2;
+            --text-grey: #888888;
+            --neon-blue: #00ffff;
+            --neon-purple: #b000f9;
+            --neon-red: #ff0040;
+            --card-border: var(--bg-secondary);
+            --card-shadow: 0 0 15px rgba(0, 0, 0, 0.5);
+        }
+
+        body.light-theme {
+            --bg-primary: #f0f0f5;
+            --bg-secondary: #ffffff;
+            --text-color: #1a1a1a;
+            --text-grey: #666666;
+            --neon-blue: #007bff;
+            --neon-purple: #6a11cb;
+            --neon-red: #ff4d4d;
+            --card-border: #e0e0e0;
+            --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            color: var(--text-color);
+        }
+
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-color);
+            transition: background-color 0.5s, color 0.5s;
+        }
+
+        .section-card {
+            background-color: var(--bg-secondary);
+            border: 2px solid var(--card-border);
+            box-shadow: var(--card-shadow);
+            transition: all 0.3s ease-in-out;
+        }
+
+        .section-card:hover {
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 0 20px var(--neon-blue);
+        }
+        body.light-theme .section-card:hover {
+            border: 2px solid var(--neon-blue);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+        }
+        
+        .btn-neon {
+            background: var(--neon-purple);
+            border-radius: 12px;
+            color: white;
+            font-weight: 600;
+            transition: all 0.3s ease-in-out;
+            box-shadow: 0 0 10px var(--neon-purple);
+        }
+
+        .btn-neon:hover {
+            transform: scale(1.05);
+            background: var(--neon-blue);
+            box-shadow: 0 0 20px var(--neon-blue), 0 0 30px var(--neon-blue);
+        }
+        
+        .link-neon {
+            color: var(--neon-purple);
+            transition: color 0.3s ease-in-out;
+        }
+
+        .link-neon:hover {
+            color: var(--neon-blue);
+            text-shadow: 0 0 5px var(--neon-blue);
+        }
+        body.light-theme .link-neon:hover {
+            color: var(--neon-blue);
+            text-shadow: none;
+        }
+
+        .text-gradient {
+            background: linear-gradient(90deg, var(--neon-blue), var(--neon-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: 0 0 10px rgba(0, 255, 255, 0.5);
+        }
+        body.light-theme .text-gradient {
+            background: linear-gradient(90deg, #007bff, #6a11cb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            text-shadow: none;
+        }
+
+        .glow-on-hover:hover {
+            box-shadow: 0 0 15px var(--neon-blue), 0 0 25px var(--neon-blue);
+        }
+
+        .hidden-section {
+            opacity: 0;
+            transform: translateY(50px);
+            transition: opacity 1s ease-out, transform 1s ease-out;
+        }
+        
+        .visible-section {
+            opacity: 1;
+            transform: translateY(0);
+        }
+        .chat-container {
+            display: none;
+            position: fixed;
+            bottom: 80px;
+            right: 20px;
+            width: 350px;
+            max-width: 90%;
+            height: 450px;
+            background: var(--bg-secondary);
+            border-radius: 1rem;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.4);
+            z-index: 1000;
+            flex-direction: column;
+            overflow: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        .chat-header {
+            background-color: var(--neon-purple);
+            color: white;
+            padding: 1rem;
+            border-top-left-radius: 1rem;
+            border-top-right-radius: 1rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chat-messages {
+            flex-grow: 1;
+            overflow-y: auto;
+            padding: 1rem;
+            background-color: var(--bg-secondary);
+            display: flex;
+            flex-direction: column;
+        }
+        .chat-input-area {
+            display: flex;
+            padding: 1rem;
+            border-top: 1px solid var(--neon-blue);
+        }
+
+        /* Brands Carousel CSS */
+        @keyframes scroll {
+            0% { transform: translateX(0); }
+            100% { transform: translateX(-100%); }
+        }
+        .brands-carousel-container {
+            overflow: hidden;
+            position: relative;
+        }
+        .brands-carousel {
+            display: flex;
+            width: fit-content;
+            animation: scroll 30s linear infinite;
+        }
+        .brands-carousel-container:hover .brands-carousel {
+            animation-play-state: paused;
+        }
+
+        .floating-buttons {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: flex-end;
+            gap: 12px;
+            z-index: 1000;
+        }
+
+        .star-rating {
+            color: gold;
+        }
+
+        /* Theme Toggle styles */
+        .theme-toggle {
+            cursor: pointer;
+            width: 44px;
+            height: 24px;
+            background: #fff;
+            border-radius: 9999px;
+            position: relative;
+            transition: background-color 0.3s;
+        }
+        .theme-toggle:before {
+            content: '';
+            position: absolute;
+            left: 2px;
+            top: 2px;
+            width: 20px;
+            height: 20px;
+            background: #0d0d0d;
+            border-radius: 9999px;
+            transition: transform 0.3s;
+        }
+        body.light-theme .theme-toggle {
+            background: #2d2d2d;
+        }
+        body.light-theme .theme-toggle:before {
+            transform: translateX(20px);
+            background: #f0f0f5;
+        }
+        .theme-toggle .icon-moon, .theme-toggle .icon-sun {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 14px;
+        }
+        .theme-toggle .icon-moon {
+            right: 4px;
+            color: #0d0d0d;
+            opacity: 1;
+            transition: opacity 0.3s;
+        }
+        .theme-toggle .icon-sun {
+            left: 4px;
+            color: #f0f0f5;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        body.light-theme .theme-toggle .icon-moon {
+            opacity: 0;
+        }
+        body.light-theme .theme-toggle .icon-sun {
+            opacity: 1;
+        }
+
+    </style>
+</head>
+<body class="bg-[#0d0d0d] text-[#f2f2f2]">
+
+    <!-- Floating Action Buttons -->
+    <div class="floating-buttons">
+        <a href="#contact" class="bg-blue-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform duration-300 btn-neon" style="--neon-purple: #00ffff; --neon-blue: #00ffff;">
+            <i class="fas fa-map-marked-alt text-2xl"></i>
+        </a>
+        <a href="tel:9335222840" class="bg-purple-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform duration-300 btn-neon">
+            <i class="fas fa-phone-alt text-2xl"></i>
+        </a>
+        <button id="chat-button" class="bg-indigo-600 text-white p-4 rounded-full shadow-lg hover:scale-110 transition-transform duration-300 btn-neon" style="--neon-purple: #ff0040; --neon-blue: #ff0040;">
+            <i class="fas fa-comments text-2xl"></i>
+        </button>
+    </div>
+
+    <!-- Live Chat Window -->
+    <div id="chat-window" class="chat-container">
+        <div class="chat-header">
+            <span>Public Chat</span>
+            <button id="close-chat" class="text-white">&times;</button>
+        </div>
+        <div id="chat-messages" class="chat-messages">
+            <!-- Messages will be loaded here -->
+        </div>
+        <div class="chat-input-area">
+            <form id="chat-form" class="flex w-full">
+                <input id="chat-input" type="text" placeholder="Type a message..." class="flex-grow rounded-l-full px-4 py-2 bg-[#1a1a1a] text-[#f2f2f2] focus:outline-none focus:ring-2 focus:ring-blue-500">
+                <button type="submit" class="bg-blue-500 text-white px-6 py-2 rounded-r-full hover:bg-blue-600 transition-colors">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Navigation Bar -->
+    <header class="bg-[#1a1a1a]/80 backdrop-blur-lg sticky top-0 z-50 border-b-2 border-neon-blue transition-colors duration-500">
+        <nav class="container mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center space-x-4">
+                <div class="text-3xl font-extrabold text-gradient">
+                    Ashirwad
+                </div>
+                <div class="text-xl font-light text-[#888888]">
+                    Sanitary & Tiles
+                </div>
+            </div>
+            <div class="flex items-center space-x-8">
+                <a href="#home" class="link-neon text-sm font-medium">Home</a>
+                <a href="#about" class="link-neon text-sm font-medium">About Us</a>
+                <a href="#products" class="link-neon text-sm font-medium">Products</a>
+                <a href="#brands" class="link-neon text-sm font-medium">Brands</a>
+                <a href="#contact" class="link-neon text-sm font-medium">Contact</a>
+                <div id="theme-toggle" class="theme-toggle" title="Toggle Theme">
+                    <i class="fas fa-moon icon-moon"></i>
+                    <i class="fas fa-sun icon-sun"></i>
+                </div>
+            </div>
+        </nav>
+    </header>
+
+    <!-- Home Page -->
+    <section id="home" class="relative min-h-screen flex items-center justify-center p-8 overflow-hidden">
+        <video autoplay muted loop playsinline class="absolute top-0 left-0 w-full h-full object-cover z-0">
+            <source src="https://assets.mixkit.co/videos/preview/mixkit-beautiful-bathroom-decor-3595-large.mp4" type="video/mp4">
+        </video>
+        <div class="absolute inset-0 bg-black/80 z-10"></div>
+        <div class="relative z-20 text-center p-8 md:p-12 section-card rounded-[12px]">
+            <h1 class="text-4xl sm:text-5xl md:text-6xl font-extrabold mb-4 text-gradient">
+                Welcome to Ashirwad Sanitary & Tiles
+            </h1>
+            <p class="text-lg md:text-xl font-light tracking-wide mb-8 text-[#888888]">
+                Crafting Spaces with Elegance and Excellence Since 2005.
+            </p>
+            
+            <!-- New Promotional Text Block -->
+            <div class="text-left bg-[#1a1a1a] p-6 rounded-xl border-2 border-neon-purple shadow-lg mb-8">
+                <p class="text-xl font-bold mb-4 text-gradient">
+                    ?? Aashirwad Sanitary & Tiles
+                </p>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm md:text-base">
+                    <p>?? Premium Showroom • Est. 2005 • Lucknow</p>
+                    <p>? Modern Tiles • Vanities • Mirrors • Washbasins</p>
+                    <p>?? Water-Resistant Parking Tiles • Water Gel Tiles • Shower Panels</p>
+                    <p>?? Designer Bathroom Fittings • Futuristic Sanitaryware</p>
+                    <p>?? Top Brands • Curated Quality • Honest Pricing</p>
+                    <p>?? 1000+ Products • Ready Stock • Fast Delivery</p>
+                    <p>?? Trusted by Thousands • 20+ Years of Excellence</p>
+                    <p>?? Visit Us: Telibagh, Lucknow</p>
+                    <p>?? Owner: Mr. Arvind Mittal</p>
+                    <p>?? 9335222840</p>
+                    <p>?? Transparent Billing • Professional Support</p>
+                    <p>?? Website Experience: Ultra Aesthetic • Smooth • Clean</p>
+                    <p>??? Explore Everything in One Beautiful Space</p>
+                </div>
+            </div>
+
+            <div class="flex flex-col md:flex-row justify-center space-y-4 md:space-y-0 md:space-x-8">
+                <a href="#products" class="btn-neon py-3 px-8">Explore Our Collection</a>
+                <a href="#contact" class="btn-neon py-3 px-8">Visit Showroom</a>
+                <a href="#quote" class="btn-neon py-3 px-8" style="background:var(--neon-blue); box-shadow:0 0 10px var(--neon-blue);">Get Quote</a>
+            </div>
+            <div class="mt-8 text-lg font-light text-[#888888]">
+                <p><i class="fas fa-user-circle link-neon mr-2"></i>Owner: Mr. Arvind Mittal</p>
+                <p><i class="fas fa-phone-alt link-neon mr-2"></i>Contact: <a href="tel:9335222840" class="link-neon">9335222840</a></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- About Us Page -->
+    <section id="about" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto max-w-4xl">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    ??? About Us — In Timeless Tradition
+                </h2>
+                <h3 class="text-lg md:text-xl font-light text-[#888888] italic">
+                    Quality is our tradition. Trust is our foundation.
+                </h3>
+            </div>
+            <div class="section-card p-8 rounded-[12px] shadow-xl">
+                <p class="text-[var(--text-color)] mb-4">
+                    In an age when craftsmanship was king and every brick whispered a story, *Aashirwad Sanitary & Tiles* was born with a vision of elegance and excellence. Established in 2005, yet carrying the heart of a golden era, our showroom is a nostalgic blend of classic charm and modern sophistication.
+                </p>
+                <p class="text-[var(--text-color)] mb-4">
+                    With over two decades of unshaken trust, we are not merely a store — we are curators of comfort, beauty, and authenticity. Our walls echo the legacy of quality, and our floors are laid with dreams crafted in tile and stone.
+                </p>
+                <h4 class="text-2xl font-bold text-gradient mt-8 mb-2">????? Mr. Arvind Mittal, our venerable founder</h4>
+                <p class="text-[var(--text-color)] mb-4">
+                    is a gentleman of grace and experience. With over 20 years immersed in the world of sanitaryware and tiles, he upholds values of integrity, excellence, and personal care. Much like the merchants of old, he believes that every customer deserves both quality and respect.
+                </p>
+                <p class="text-[var(--text-color)] mb-4">
+                    ?? From vintage washbasins to sleek mirrors, from classic vanities to durable parking tiles, our collection is a tribute to timeless taste.
+                </p>
+                <p class="text-[var(--text-color)] mb-4">
+                    Step inside our space, and you don't just explore a showroom — you enter an era. One where service was an art, and every fitting spoke of finesse.
+                </p>
+                <h4 class="text-center font-bold text-gradient text-xl mt-8">
+                    ?? Aashirwad Sanitary & Tiles — A Tradition of Trust, Since 2005. ??
+                </h4>
+            </div>
+        </div>
+    </section>
+
+    <!-- Product Categories Page -->
+    <section id="products" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-boxes-stacked link-neon mr-2"></i>Our Product Categories
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)]">
+                    Explore a world of design possibilities for your home or project.
+                </p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <!-- Product Card 1: Wall Tiles -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-border-all text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Wall Tiles</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Stylish and durable tiles for your kitchen, bathroom, and living room walls.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 2: Floor Tiles -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-grip-lines-vertical text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Floor Tiles</h3>
+                        <p class="text-[var(--text-grey)]">
+                            High-quality vitrified, ceramic, and anti-skid tiles for all floor applications.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 3: Sanitaryware -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-toilet text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Sanitaryware</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Modern washbasins, toilets, and sleek cisterns for a complete bathroom solution.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 4: Plumbing Materials -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-pipe text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Plumbing Materials</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Durable PVC pipes, fittings, and adhesives for a leak-proof and strong foundation.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 5: Taps & Showers -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-faucet-drip text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Taps & Showers</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Stylish and efficient taps, mixers, and shower panels from leading brands.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 6: Vanity & Mirrors -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-mirror text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Vanity & Mirrors</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Elegant vanity units and high-quality mirrors to complete your bathroom design.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 7: Kitchen Sinks -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-sink text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Kitchen Sinks</h3>
+                        <p class="text-[var(--text-grey)]">
+                            Stainless steel and granite kitchen sinks for a functional and modern kitchen.
+                        </p>
+                    </div>
+                </div>
+                <!-- Product Card 8: Accessories -->
+                <div class="relative group section-card p-6 rounded-[12px] shadow-xl hover:scale-105 transition-transform duration-300 overflow-hidden">
+                    <div class="relative z-10">
+                        <i class="fas fa-toilet-paper text-4xl link-neon mb-4"></i>
+                        <h3 class="text-2xl font-bold mb-2 text-[var(--text-color)]">Bathroom Accessories</h3>
+                        <p class="text-[var(--text-grey)]">
+                            A wide range of essential bathroom accessories to enhance usability and style.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Brands We Deal In -->
+    <section id="brands" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-award link-neon mr-2"></i>Trusted Brands
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)]">
+                    Partnering with the best in the industry to bring you quality.
+                </p>
+            </div>
+            <div class="relative w-full overflow-hidden brands-carousel-container py-8">
+                <div class="flex whitespace-nowrap brands-carousel">
+                    <!-- Brand logos (repeated for infinite scroll effect) -->
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Kajaria" alt="Kajaria" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Somany" alt="Somany" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Cera" alt="Cera" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Jaquar" alt="Jaquar" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Parryware" alt="Parryware" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Hindware" alt="Hindware" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=AGL" alt="AGL" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Simpolo" alt="Simpolo" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <!-- Repeat the logos to create a seamless loop -->
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Kajaria" alt="Kajaria" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Somany" alt="Somany" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Cera" alt="Cera" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                    <img src="https://placehold.co/150x80/0d0d0d/00ffff?text=Jaquar" alt="Jaquar" class="h-16 mx-8 filter grayscale hover:grayscale-0 transition-all duration-300">
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Customer Testimonials Page -->
+    <section id="testimonials" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-comments link-neon mr-2"></i>What Our Customers Say
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)]">
+                    Hear from the thousands we've served over 20+ years.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                <!-- Testimonial 1 -->
+                <div class="section-card p-8 rounded-[12px] shadow-xl">
+                    <div class="star-rating text-2xl mb-4">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="text-[var(--text-color)] italic mb-4">
+                        "I had visited almost every tile showroom in Lucknow, but nothing matched the elegance and genuine warmth I found at Aashirwad Sanitary & Tiles. The staff was polite, Mr. Mittal personally helped us, and their water-resistant tiles look premium even after 2 monsoons. Full paisa vasool!"
+                    </p>
+                    <p class="font-bold text-[var(--text-color)]">
+                        — Priya Srivastava <span class="text-[var(--text-grey)]">(Gomti Nagar, Lucknow)</span>
+                    </p>
+                </div>
+                <!-- Testimonial 2 -->
+                <div class="section-card p-8 rounded-[12px] shadow-xl">
+                    <div class="star-rating text-2xl mb-4">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="text-[var(--text-color)] italic mb-4">
+                        "Aashirwad is not just a showroom — it feels like a design studio. I came for parking tiles but ended up redoing my entire bathroom! The quality, price range, and honest suggestions by Mr. Arvind Mittal ji made me a permanent customer. Highly trustworthy!"
+                    </p>
+                    <p class="font-bold text-[var(--text-color)]">
+                        — Rakesh Verma <span class="text-[var(--text-grey)]">(Alambagh, Lucknow)</span>
+                    </p>
+                </div>
+                <!-- Testimonial 3 -->
+                <div class="section-card p-8 rounded-[12px] shadow-xl">
+                    <div class="star-rating text-2xl mb-4">
+                        <i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i><i class="fas fa-star"></i>
+                    </div>
+                    <p class="text-[var(--text-color)] italic mb-4">
+                        "This is the only place I’ve seen where they don’t oversell. I asked for a modern mirror setup and they showed me affordable and premium options — no pressure at all. My washbasin and shower panel look like they're from a luxury resort. Highly recommended!"
+                    </p>
+                    <p class="font-bold text-[var(--text-color)]">
+                        — Meenal Kapoor <span class="text-[var(--text-grey)]">(Rajajipuram, Lucknow)</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Gallery Section -->
+    <section id="gallery" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-images link-neon mr-2"></i>Showroom Gallery
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)]">
+                    A glimpse into our stunning collections and installed work.
+                </p>
+                <button id="add-photo-button" class="mt-8 btn-neon py-3 px-6" style="background:var(--neon-blue); box-shadow:0 0 10px var(--neon-blue);">
+                    <i class="fas fa-camera mr-2"></i> Add Photo
+                </button>
+                <input type="file" id="file-input" accept="image/*" class="hidden">
+            </div>
+            <div id="gallery-grid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                <!-- Gallery items will be added here -->
+            </div>
+        </div>
+    </section>
+
+    <!-- Bill & Discount Panel -->
+    <section id="billing" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-file-invoice-dollar link-neon mr-2"></i>Transparent Billing
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)] mb-8">
+                    We believe in honesty and clarity. That’s why every purchase from Aashirwad Sanitary & Tiles comes with a detailed invoice that ensures complete transparency.
+                </p>
+                <div class="section-card p-8 rounded-[12px] shadow-2xl inline-block max-w-4xl mx-auto text-left">
+                    <div class="text-center mb-6">
+                        <p class="font-bold text-2xl text-gradient">Aashirwad Sanitary & Tiles</p>
+                        <p class="text-sm text-[var(--text-grey)]">Faizabad Road, Chinhat, Lucknow</p>
+                        <p class="text-sm text-[var(--text-grey)]">Mobile: 9335222840</p>
+                        <p class="text-sm text-[var(--text-grey)]">GSTIN: (sample)</p>
+                    </div>
+                    <hr class="border-[var(--text-grey)] mb-6">
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm mb-6">
+                        <div>
+                            <p class="font-bold">Invoice To:</p>
+                            <p>Name: Mr. Rahul Sharma</p>
+                            <p>Mobile: 9876543210</p>
+                            <p>Address: Gomti Nagar, Lucknow</p>
+                        </div>
+                        <div class="text-left sm:text-right">
+                            <p class="font-bold">Date: [Sample Date]</p>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm mb-6 table-auto">
+                            <thead>
+                                <tr class="text-left font-bold border-b border-[var(--text-grey)]">
+                                    <th class="py-2 px-2">Sr</th>
+                                    <th class="py-2 px-2">Item Name</th>
+                                    <th class="py-2 px-2">Brand</th>
+                                    <th class="py-2 px-2">Qty</th>
+                                    <th class="py-2 px-2">Rate</th>
+                                    <th class="py-2 px-2 text-right">Amount</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td class="py-2 px-2">1</td>
+                                    <td class="py-2 px-2">Digital Wall Tiles</td>
+                                    <td class="py-2 px-2">Kajaria</td>
+                                    <td class="py-2 px-2">20</td>
+                                    <td class="py-2 px-2">?180</td>
+                                    <td class="py-2 px-2 text-right">?3,600</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-2">2</td>
+                                    <td class="py-2 px-2">Wash Basin Vanity</td>
+                                    <td class="py-2 px-2">Cera</td>
+                                    <td class="py-2 px-2">1</td>
+                                    <td class="py-2 px-2">?7,500</td>
+                                    <td class="py-2 px-2 text-right">?7,500</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-2">3</td>
+                                    <td class="py-2 px-2">Shower Panel</td>
+                                    <td class="py-2 px-2">Jaquar</td>
+                                    <td class="py-2 px-2">1</td>
+                                    <td class="py-2 px-2">?12,000</td>
+                                    <td class="py-2 px-2 text-right">?12,000</td>
+                                </tr>
+                                <tr>
+                                    <td class="py-2 px-2">4</td>
+                                    <td class="py-2 px-2">Floor Tiles 16"x16"</td>
+                                    <td class="py-2 px-2">Somany</td>
+                                    <td class="py-2 px-2">30</td>
+                                    <td class="py-2 px-2">?160</td>
+                                    <td class="py-2 px-2 text-right">?4,800</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="text-right font-bold text-lg mb-2">Sub Total: ?27,900</div>
+                    <div class="text-right text-red-500 mb-2">Discount (5%): -?1,395</div>
+                    <div class="text-right font-bold text-xl text-green-500">Net Payable: ?26,505</div>
+                    <div class="mt-6 text-center text-sm">
+                        <p class="text-[var(--text-grey)]">? Thank you for shopping with Aashirwad Sanitary & Tiles!</p>
+                        <p class="font-bold text-[var(--text-color)]">Visit Again • Quality Assured • Best Prices Guaranteed</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Page -->
+    <section id="contact" class="py-24 px-8 hidden-section">
+        <div class="container mx-auto">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl md:text-5xl font-bold text-gradient mb-4">
+                    <i class="fas fa-headset link-neon mr-2"></i>Get in Touch
+                </h2>
+                <p class="text-lg md:text-xl text-[var(--text-grey)]">
+                    Visit us to see our full collection or contact us for inquiries.
+                </p>
+            </div>
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                <div class="lg:col-span-1">
+                    <form class="section-card p-8 rounded-[12px] shadow-xl">
+                        <h3 class="text-3xl font-bold mb-6 text-[var(--text-color)]">Request a Quote</h3>
+                        <div class="mb-4">
+                            <input type="text" placeholder="Your Name" class="w-full px-4 py-3 rounded-lg bg-[var(--bg-primary)] border-2 border-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[#b000f9] text-[var(--text-color)]">
+                        </div>
+                        <div class="mb-4">
+                            <input type="email" placeholder="Your Email" class="w-full px-4 py-3 rounded-lg bg-[var(--bg-primary)] border-2 border-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[#b000f9] text-[var(--text-color)]">
+                        </div>
+                        <div class="mb-4">
+                            <input type="tel" placeholder="Your Phone Number" class="w-full px-4 py-3 rounded-lg bg-[var(--bg-primary)] border-2 border-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[#b000f9] text-[var(--text-color)]">
+                        </div>
+                        <div class="mb-4">
+                            <textarea placeholder="Your Message or Product Need" rows="4" class="w-full px-4 py-3 rounded-lg bg-[var(--bg-primary)] border-2 border-[var(--bg-secondary)] focus:outline-none focus:ring-2 focus:ring-[#b000f9] text-[var(--text-color)]"></textarea>
+                        </div>
+                        <button type="submit" class="w-full btn-neon py-3" style="background:var(--neon-purple); box-shadow:0 0 10px var(--neon-purple);">Send Message</button>
+                    </form>
+                </div>
+                <div class="lg:col-span-1">
+                    <div class="section-card p-8 rounded-[12px] shadow-xl">
+                        <h3 class="text-3xl font-bold mb-6 text-[var(--text-color)]">Our Location</h3>
+                        <p class="text-lg text-[var(--text-grey)] mb-4">
+                            Shop No M-D1, Sec-D, Near Green Medicals Centre, Power House Road, LDA Colony-226012, Lucknow.
+                        </p>
+                        <div class="w-full h-80 rounded-lg overflow-hidden shadow-lg mb-4">
+                            <iframe src="https://www.google.com/maps/embed?pb=!1m18!1m12!1m3!1d3560.751241517036!2d80.89312117537677!3d26.819777562095585!2m3!1f0!2f0!3f0!3m2!1i1024!2i768!4f13.1!3m3!1m2!1s0x399bfd933390c525%3A0xc07ce9b1f2b4c107!2sLDA%20Colony%2C%20Lucknow%2C%20Uttar%20Pradesh%20226012%2C%20India!5e0!3m2!1sen!2sus!4v1699351052865!5m2!1sen!2sus" width="100%" height="100%" style="border:0;" allowfullscreen="" loading="lazy"></iframe>
+                        </div>
+                        <p class="text-lg text-[var(--text-grey)] mb-2">
+                            <i class="fas fa-phone-alt link-neon mr-2"></i> Phone: <a href="tel:9335222840" class="link-neon">9335222840</a>
+                        </p>
+                        <p class="text-lg text-[var(--text-grey)]">
+                            <i class="fas fa-envelope link-neon mr-2"></i> Email: info@ashirwadsanitary.com
+                        </p>
+                        <div class="mt-4">
+                            <a href="https://wa.me/9335222840" class="inline-block btn-neon py-2 px-4" style="background:var(--neon-blue); box-shadow:0 0 10px var(--neon-blue);">
+                                <i class="fab fa-whatsapp mr-2"></i> WhatsApp Us
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="bg-[var(--bg-secondary)] text-[var(--text-grey)] py-12 px-8">
+        <div class="container mx-auto text-center">
+            <div class="flex justify-center space-x-6 mb-6">
+                <a href="https://www.facebook.com/your-facebook-page" target="_blank" class="link-neon"><i class="fab fa-facebook-f text-2xl"></i></a>
+                <a href="https://www.instagram.com/aashirwad.sanitary.tiles/?hl=en" target="_blank" class="link-neon"><i class="fab fa-instagram text-2xl"></i></a>
+                <a href="https://wa.me/9335222840" target="_blank" class="link-neon"><i class="fab fa-whatsapp text-2xl"></i></a>
+            </div>
+            <p class="text-lg mb-2 text-[var(--text-color)]">Owner: Mr. Arvind Mittal</p>
+            <p class="text-lg mb-2 text-[var(--text-color)]">Location: Lucknow, UP</p>
+            <p class="text-sm">&copy; 2025 Ashirwad Sanitary & Tiles. All rights reserved.</p>
+            <a href="https://www.instagram.com/p/DM750KEJx_h/?hl=en" target="_blank" class="mt-6 inline-block btn-neon py-3 px-6 text-sm" style="background:var(--neon-blue); box-shadow:0 0 10px var(--neon-blue);">
+                <i class="fas fa-download mr-2"></i> Download Digital Business Card
+            </a>
+        </div>
+    </footer>
+
+    <!-- JavaScript for dynamic functionality -->
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const hiddenSections = document.querySelectorAll('.hidden-section');
+            const observer = new IntersectionObserver((entries) => {
+                entries.forEach(entry => {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('visible-section');
+                        observer.unobserve(entry.target);
+                    }
+                });
+            }, { threshold: 0.1 });
+
+            hiddenSections.forEach(section => {
+                observer.observe(section);
+            });
+
+            const chatButton = document.getElementById('chat-button');
+            const chatWindow = document.getElementById('chat-window');
+            const closeChatBtn = document.getElementById('close-chat');
+
+            chatButton.addEventListener('click', () => {
+                chatWindow.style.display = 'flex';
+                // Pre-populate with AI welcome message
+                try {
+                    window.sendMessage("Hi there! I am your AI assistant. I can help with basic questions about our location, contact number, or business hours. Just type your question in the chat!", true);
+                } catch (error) {
+                    console.error("Failed to send message: sendMessage function not available.", error);
+                }
+            });
+            
+            closeChatBtn.addEventListener('click', () => {
+                chatWindow.style.display = 'none';
+            });
+            
+            // Theme Toggle
+            const themeToggle = document.getElementById('theme-toggle');
+            themeToggle.addEventListener('click', () => {
+                document.body.classList.toggle('light-theme');
+            });
+
+            const addPhotoButton = document.getElementById('add-photo-button');
+            const fileInput = document.getElementById('file-input');
+            const galleryGrid = document.getElementById('gallery-grid');
+
+            addPhotoButton.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (file) {
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        const imgUrl = e.target.result;
+                        const newImageDiv = document.createElement('div');
+                        newImageDiv.className = 'w-full h-48 rounded-lg overflow-hidden shadow-lg border-2 border-[var(--card-border)] transition-all duration-300 hover:border-neon-blue hover:scale-105';
+                        newImageDiv.innerHTML = `<img src="${imgUrl}" alt="Gallery image" class="w-full h-full object-cover">`;
+                        galleryGrid.appendChild(newImageDiv);
+                    };
+                    reader.readAsDataURL(file);
+                }
+            });
+        });
+    </script>
+</body>
+</html>
